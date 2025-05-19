@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile
 from typing import Dict, List
+from fastapi.responses import HTMLResponse
 from sqlmodel import text
 
 import io
@@ -145,72 +146,85 @@ def hired_above_average(session: session_dep):
 
 
 
-# @app.get("/hired/employees/html", response_class=HTMLResponse)
-# def hired_employees_html(session: Session = Depends(get_session)):
-#     sql = """
-#         SELECT 
-#             deps.department,
-#             jobs.job,
-#             SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 1 THEN 1 ELSE 0 END) AS Q1,
-#             SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 2 THEN 1 ELSE 0 END) AS Q2,
-#             SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 3 THEN 1 ELSE 0 END) AS Q3,
-#             SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 4 THEN 1 ELSE 0 END) AS Q4
-#         FROM 
-#             hired_employeesbase as emp
-#         LEFT JOIN departments as deps
-#             ON deps.id = emp.department_id
-#         LEFT JOIN jobs as jobs
-#             ON jobs.id = emp.job_id
-#         WHERE 
-#             YEAR(emp.[datetime]) = 2021
-#             AND emp.department_id IS NOT NULL
-#         GROUP BY 
-#             deps.department,
-#             jobs.job
-#         ORDER BY 
-#             deps.department,
-#             jobs.job;
-#     """
-#     result = session.exec(sql)
-#     rows = result.fetchall()
-#     columns = result.keys()
+@router.get("/hired/quarterly/html", response_class=HTMLResponse)
+def hired_employees_html(session: session_dep):
+    """
+    Executes a SQL query to return the number of employees hired per quarter (Q1–Q4)
+    in the year 2021, grouped by department and job title.
+    Each result row shows how many people were hired for a specific job in a 
+    specific department in each quarter of 2021.
+    Returns an HTML to be rendered on screen. 
+    """
+    sql = """
+        SELECT 
+            deps.department,
+            jobs.job,
+            SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 1 THEN 1 ELSE 0 END) AS Q1,
+            SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 2 THEN 1 ELSE 0 END) AS Q2,
+            SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 3 THEN 1 ELSE 0 END) AS Q3,
+            SUM(CASE WHEN DATEPART(QUARTER, emp.[datetime]) = 4 THEN 1 ELSE 0 END) AS Q4
+        FROM 
+            hired_employeesbase as emp
+        LEFT JOIN departments as deps
+            ON deps.id = emp.department_id
+        LEFT JOIN jobs as jobs
+            ON jobs.id = emp.job_id
+        WHERE 
+            YEAR(emp.[datetime]) = 2021
+            AND emp.department_id IS NOT NULL
+        GROUP BY 
+            deps.department,
+            jobs.job
+        ORDER BY 
+            deps.department,
+            jobs.job;
+    """
+    result = session.exec(sql)
+    rows = result.fetchall()
+    columns = result.keys()
 
-#     # Build HTML
-#     html = "<table border='1'><thead><tr>" + "".join(f"<th>{col}</th>" for col in columns) + "</tr></thead><tbody>"
-#     for row in rows:
-#         html += "<tr>" + "".join(f"<td>{val}</td>" for val in row) + "</tr>"
-#     html += "</tbody></table>"
+    # Build HTML
+    html = "<table border='1'><thead><tr>" + "".join(f"<th>{col}</th>" for col in columns) + "</tr></thead><tbody>"
+    for row in rows:
+        html += "<tr>" + "".join(f"<td>{val}</td>" for val in row) + "</tr>"
+    html += "</tbody></table>"
 
-#     return html
+    return html
 
 
-# @app.get("/hired/employees/above-average-html", response_class=HTMLResponse)
-# def hired_above_average_html(session: Session = Depends(get_session)):
-#     sql = """
-#         SELECT 
-#             department_id as id,
-#             deps.department, 
-#             COUNT(emp.id) AS hired
-#         FROM [dbo].[hired_employeesbase] AS emp
-#         LEFT JOIN departments AS deps
-#             ON emp.department_id = deps.id
-#         WHERE YEAR(emp.datetime) = 2021
-#         GROUP BY emp.department_id, deps.department
-#         HAVING COUNT(emp.id) > (
-#             SELECT COUNT(id) / COUNT(DISTINCT department_id) 
-#             FROM [dbo].[hired_employeesbase] 
-#             WHERE YEAR(datetime) = 2021
-#         )
-#         ORDER BY COUNT(emp.id) DESC;
-#     """
+@router.get("/hired/above-average-html", response_class=HTMLResponse)
+def hired_above_average_html(session: session_dep):
+    """
+    Executes a SQL query to return all departments whose number of hires
+    in the year 2021 is greater than the average number of hires per department 
+    during that year.
+    Returns an HTML to be rendered on screen. 
+    """
+    sql = """
+        SELECT 
+            department_id as id,
+            deps.department, 
+            COUNT(emp.id) AS hired
+        FROM [dbo].[hired_employeesbase] AS emp
+        LEFT JOIN departments AS deps
+            ON emp.department_id = deps.id
+        WHERE YEAR(emp.datetime) = 2021
+        GROUP BY emp.department_id, deps.department
+        HAVING COUNT(emp.id) > (
+            SELECT COUNT(id) / COUNT(DISTINCT department_id) 
+            FROM [dbo].[hired_employeesbase] 
+            WHERE YEAR(datetime) = 2021
+        )
+        ORDER BY COUNT(emp.id) DESC;
+    """
 
-#     result = session.exec(sql)
-#     rows = result.fetchall()
-#     columns = result.keys()
+    result = session.exec(sql)
+    rows = result.fetchall()
+    columns = result.keys()
 
-#     html = "<table border='1'><thead><tr>" + "".join(f"<th>{col}</th>" for col in columns) + "</tr></thead><tbody>"
-#     for row in rows:
-#         html += "<tr>" + "".join(f"<td>{val}</td>" for val in row) + "</tr>"
-#     html += "</tbody></table>"
+    html = "<table border='1'><thead><tr>" + "".join(f"<th>{col}</th>" for col in columns) + "</tr></thead><tbody>"
+    for row in rows:
+        html += "<tr>" + "".join(f"<td>{val}</td>" for val in row) + "</tr>"
+    html += "</tbody></table>"
 
-#     return html
+    return html
